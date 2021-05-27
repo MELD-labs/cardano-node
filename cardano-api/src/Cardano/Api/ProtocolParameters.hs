@@ -57,22 +57,20 @@ module Cardano.Api.ProtocolParameters (
 
 import           Prelude
 
+import           Control.Applicative ((<|>))
+import           Data.Aeson (FromJSON (..), ToJSON (..), object, withObject, (.!=), (.:), (.:?),
+                   (.=))
+import qualified Data.Aeson as Aeson
+import           Data.Bifunctor (bimap)
 import           Data.ByteString (ByteString)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import           Data.String (IsString)
-import qualified Data.Scientific as Scientific
-import           Data.Text (Text)
 import           Data.Maybe (fromMaybe)
-import           GHC.Generics
-import           Numeric.Natural
-
-import           Control.Monad
-
-import           Data.Aeson (FromJSON (..), ToJSON (..), object, withObject,
-                   (.!=), (.:), (.:?), (.=))
-import qualified Data.Aeson as Aeson
-import           Data.Bifunctor (bimap)
+import qualified Data.Scientific as Scientific
+import           Data.String (IsString)
+import           Data.Text (Text)
+import           GHC.Generics (Generic)
+import           Numeric.Natural (Natural)
 
 import qualified Cardano.Binary as CBOR
 import qualified Cardano.Crypto.Hash.Class as Crypto
@@ -85,13 +83,12 @@ import           Cardano.Ledger.Crypto (StandardCrypto)
 import qualified Cardano.Ledger.Era as Ledger
 import qualified Cardano.Ledger.Keys as Ledger
 
-import qualified Shelley.Spec.Ledger.PParams as Ledger
-                   (Update(..), ProposedPPUpdates(..), ProtVer(..))
+import qualified Shelley.Spec.Ledger.PParams as Ledger (ProposedPPUpdates (..), ProtVer (..),
+                   Update (..))
 -- Some of the things from Shelley.Spec.Ledger.PParams are generic across all
 -- eras, and some are specific to the Shelley era (and other pre-Alonzo eras).
 -- So we import in twice under different names.
-import qualified Shelley.Spec.Ledger.PParams as Shelley
-                   (PParams, PParams'(..), PParamsUpdate)
+import qualified Shelley.Spec.Ledger.PParams as Shelley (PParams, PParams' (..), PParamsUpdate)
 
 import qualified Cardano.Ledger.Alonzo.Language as Alonzo
 import qualified Cardano.Ledger.Alonzo.PParams as Alonzo
@@ -431,6 +428,8 @@ data ProtocolParametersUpdate =
        -- | The minimum permitted value for new UTxO entries, ie for
        -- transaction outputs.
        --
+       -- /No longer used in Alonzo era, replaced by
+       --  protocolUpdateUTxOCostPerWord/
        protocolUpdateMinUTxOValue :: Maybe Lovelace,
 
        -- | The deposit required to register a stake address.
@@ -475,6 +474,7 @@ data ProtocolParametersUpdate =
        -- This is the \"tau\" incentives parameter from the design document.
        --
        protocolUpdateTreasuryCut :: Maybe Rational,
+
        -- Introduced in Alonzo
 
        -- | Cost in ada per word of UTxO storage.
@@ -553,7 +553,7 @@ instance Semigroup ProtocolParametersUpdate where
       where
         -- prefer the right hand side:
         merge :: (ProtocolParametersUpdate -> Maybe a) -> Maybe a
-        merge f = f ppu2 `mplus` f ppu1
+        merge f = f ppu2 <|> f ppu1
 
         -- prefer the right hand side:
         mergeMap :: Ord k => (ProtocolParametersUpdate -> Map k a) -> Map k a
@@ -987,22 +987,25 @@ toAlonzoPParamsUpdate
     , Alonzo._minPoolCost     = toShelleyLovelace <$>
                                   maybeToStrictMaybe protocolUpdateMinPoolCost
     , Alonzo._coinsPerUTxOWord  = toShelleyLovelace <$>
-                                  maybeToStrictMaybe protocolUpdateUTxOCostPerWord
+                                  maybeToStrictMaybe
+                                    protocolUpdateUTxOCostPerWord
     , Alonzo._costmdls        = if Map.null protocolUpdateCostModels
                                   then Ledger.SNothing
                                   else Ledger.SJust
                                          (toAlonzoCostModels protocolUpdateCostModels)
     , Alonzo._prices          = maybeToStrictMaybe $
-                                  toAlonzoPrices =<< protocolUpdatePrices
+                                  protocolUpdatePrices
+                                  >>= toAlonzoPrices
     , Alonzo._maxTxExUnits    = toAlonzoExUnits  <$>
                                   maybeToStrictMaybe protocolUpdateMaxTxExUnits
     , Alonzo._maxBlockExUnits = toAlonzoExUnits  <$>
                                   maybeToStrictMaybe protocolUpdateMaxBlockExUnits
     , Alonzo._maxValSize      = maybeToStrictMaybe protocolUpdateMaxValueSize
-    , Alonzo._collateralPercentage = maybeToStrictMaybe protocolUpdateCollateralPercent
-    , Alonzo._maxCollateralInputs  = maybeToStrictMaybe protocolUpdateMaxCollateralInputs
+    , Alonzo._collateralPercentage  = maybeToStrictMaybe
+                                        protocolUpdateCollateralPercent
+    , Alonzo._maxCollateralInputs   = maybeToStrictMaybe
+                                        protocolUpdateMaxCollateralInputs
     }
-
 
 -- ----------------------------------------------------------------------------
 -- Conversion functions: updates from ledger types

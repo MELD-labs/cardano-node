@@ -96,30 +96,28 @@ module Cardano.Api.Script (
 
 import           Prelude
 
-import           Data.Word (Word64)
+import           Control.Applicative
+import           Control.Monad
+import           Data.Aeson (Value (..), object, (.:), (.=))
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Encoding as Aeson
+import qualified Data.Aeson.Types as Aeson
 import qualified Data.ByteString.Lazy as LBS
 import           Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as SBS
 import           Data.Foldable (toList)
 import           Data.Scientific (toBoundedInteger)
+import qualified Data.Sequence.Strict as Seq
 import           Data.String (IsString)
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import           Data.Type.Equality (TestEquality (..), (:~:) (Refl))
 import           Data.Typeable (Typeable)
-import           Numeric.Natural (Natural)
-
-import           Data.Aeson (Value (..), object, (.:), (.=))
-import qualified Data.Aeson as Aeson
-import qualified Data.Aeson.Types as Aeson
-import qualified Data.Aeson.Encoding as Aeson
-import qualified Data.Sequence.Strict as Seq
 import           Data.Vector (Vector)
 import qualified Data.Vector as Vector
-
-import           Control.Applicative
-import           Control.Monad
+import           Data.Word (Word64)
+import           Numeric.Natural (Natural)
 
 import qualified Cardano.Binary as CBOR
 
@@ -128,11 +126,11 @@ import qualified Cardano.Crypto.Hash.Class as Crypto
 import           Cardano.Slotting.Slot (SlotNo)
 
 import qualified Cardano.Ledger.Core as Ledger
-import qualified Cardano.Ledger.Era  as Ledger
+import qualified Cardano.Ledger.Era as Ledger
 
+import qualified Cardano.Ledger.Keys as Shelley
 import qualified Cardano.Ledger.ShelleyMA.Timelocks as Timelock
 import           Ouroboros.Consensus.Shelley.Eras (StandardCrypto)
-import qualified Cardano.Ledger.Keys as Shelley
 import qualified Shelley.Spec.Ledger.Scripts as Shelley
 
 import qualified Cardano.Ledger.Alonzo.Language as Alonzo

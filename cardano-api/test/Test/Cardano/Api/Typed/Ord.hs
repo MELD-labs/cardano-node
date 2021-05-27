@@ -58,4 +58,3 @@ prop_ord_distributive_ScriptData =
 
 tests :: TestTree
 tests = fromGroup $$discover
-
