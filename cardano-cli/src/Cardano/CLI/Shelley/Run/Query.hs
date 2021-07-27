@@ -84,6 +84,7 @@ data ShelleyQueryCmdError
   | ShelleyQueryCmdPoolIdError (Hash StakePoolKey)
   | ShelleyQueryCmdEraMismatch !EraMismatch
   | ShelleyQueryCmdUnsupportedMode !AnyConsensusMode
+  | ShelleyQueryCmdUnsupportedVersion !MinNodeToClientVersion !NodeToClientVersion
   | ShelleyQueryCmdPastHorizon !Qry.PastHorizonException
   | ShelleyQueryCmdSystemStartUnavailable
   deriving Show
@@ -107,6 +108,10 @@ renderShelleyQueryCmdError err =
     ShelleyQueryCmdUnsupportedMode mode -> "Unsupported mode: " <> renderMode mode
     ShelleyQueryCmdPastHorizon e -> "Past horizon: " <> show e
     ShelleyQueryCmdSystemStartUnavailable -> "System start unavailable"
+    ShelleyQueryCmdUnsupportedVersion minNtcVersion ntcVersion ->
+      "Unsupported feature for the node-to-client protocol version.\n\
+      \This query requires at least " <> show minNtcVersion <> " but the node negotiated " <> show ntcVersion <> ".\n\
+      \Later node versions support later protocol versions (but development protocol versions are not enabled in the node by default)."
 
 runQueryCmd :: QueryCmd -> ExceptT ShelleyQueryCmdError IO ()
 runQueryCmd cmd =
@@ -151,6 +156,7 @@ runQueryProtocolParameters (AnyConsensusModeParams cModeParams) network mOutFile
       result <- executeQuery
                   era
                   cModeParams
+                  NodeToClientV_1
                   localNodeConnInfo
                   query
       writeProtocolParameters mOutFile result
@@ -314,6 +320,12 @@ queryQueryTip connectInfo mpoint = do
 -- via the local state query protocol.
 --
 
+minNtcVersionForQueryUTxOFilter :: QueryUTxOFilter -> NodeToClientVersion
+minNtcVersionForQueryUTxOFilter queryUtxoFilter = case queryUtxoFilter of
+  QueryUTxOWhole -> NodeToClientV_1
+  QueryUTxOByAddress _ -> NodeToClientV_1
+  QueryUTxOByTxIn _ -> NodeToClientV_9
+
 runQueryUTxO
   :: AnyConsensusModeParams
   -> QueryUTxOFilter
@@ -336,6 +348,7 @@ runQueryUTxO (AnyConsensusModeParams cModeParams)
       result <- executeQuery
                   era
                   cModeParams
+                  (minNtcVersionForQueryUTxOFilter qfilter)
                   localNodeConnInfo
                   qInMode
       writeFilteredUTxOs sbe mOutFile result
@@ -363,7 +376,7 @@ runQueryPoolParams (AnyConsensusModeParams cModeParams) network poolid = do
     & hoistMaybe (ShelleyQueryCmdEraConsensusModeMismatch (AnyConsensusMode cMode) anyE)
 
   let qInMode = QueryInEra eInMode . QueryInShelleyBasedEra sbe $ QueryDebugLedgerState
-  result <- executeQuery era cModeParams localNodeConnInfo qInMode
+  result <- executeQuery era cModeParams NodeToClientV_1 localNodeConnInfo qInMode
   obtainLedgerEraClassConstraints sbe (writePoolParams poolid) result
 
 
@@ -387,7 +400,7 @@ runQueryStakeSnapshot (AnyConsensusModeParams cModeParams) network poolid = do
     & hoistMaybe (ShelleyQueryCmdEraConsensusModeMismatch (AnyConsensusMode cMode) anyE)
 
   let qInMode = QueryInEra eInMode . QueryInShelleyBasedEra sbe $ QueryDebugLedgerState
-  result <- executeQuery era cModeParams localNodeConnInfo qInMode
+  result <- executeQuery era cModeParams NodeToClientV_1 localNodeConnInfo qInMode
   obtainLedgerEraClassConstraints sbe (writeStakeSnapshot poolid) result
 
 
@@ -413,6 +426,7 @@ runQueryLedgerState (AnyConsensusModeParams cModeParams)
       result <- executeQuery
                   era
                   cModeParams
+                  NodeToClientV_1
                   localNodeConnInfo
                   qInMode
       obtainLedgerEraClassConstraints sbe (writeLedgerState mOutFile) result
@@ -441,6 +455,7 @@ runQueryProtocolState (AnyConsensusModeParams cModeParams)
       result <- executeQuery
                   era
                   cModeParams
+                  NodeToClientV_1
                   localNodeConnInfo
                   qInMode
       writeProtocolState mOutFile result
@@ -474,6 +489,7 @@ runQueryStakeAddressInfo (AnyConsensusModeParams cModeParams)
       result <- executeQuery
                   era
                   cModeParams
+                  NodeToClientV_1
                   localNodeConnInfo
                   query
       writeStakeAddressInfo mOutFile $ DelegationsAndRewards result
@@ -734,6 +750,7 @@ runQueryStakeDistribution (AnyConsensusModeParams cModeParams)
       result <- executeQuery
                   era
                   cModeParams
+                  NodeToClientV_1
                   localNodeConnInfo
                   query
       writeStakeDistribution mOutFile result
@@ -823,34 +840,38 @@ determineEra cModeParams localNodeConnInfo =
       eraQ <- liftIO . queryNodeLocalState localNodeConnInfo Nothing
                      $ QueryCurrentEra CardanoModeIsMultiEra
       case eraQ of
-        Left acqFail -> left $ ShelleyQueryCmdAcquireFailure acqFail
+        Left (QueryErrorAcquireFailure acqFail) -> left $ ShelleyQueryCmdAcquireFailure acqFail
+        Left (QueryErrorUnsupportedVersion minNtcVersion ntcVersion) -> left $ ShelleyQueryCmdUnsupportedVersion minNtcVersion ntcVersion
         Right anyCarEra -> return anyCarEra
 
 executeQuery
   :: forall result era mode. CardanoEra era
   -> ConsensusModeParams mode
+  -> NodeToClientVersion
   -> LocalNodeConnectInfo mode
   -> QueryInMode mode (Either EraMismatch result)
   -> ExceptT ShelleyQueryCmdError IO result
-executeQuery era cModeP localNodeConnInfo q = do
+executeQuery era cModeP minNtcVersion localNodeConnInfo q = do
   eraInMode <- calcEraInMode era $ consensusModeOnly cModeP
   case eraInMode of
     ByronEraInByronMode -> left ShelleyQueryCmdByronEra
     _ -> liftIO execQuery >>= queryResult
  where
-   execQuery :: IO (Either AcquireFailure (Either EraMismatch result))
-   execQuery = queryNodeLocalState localNodeConnInfo Nothing q
+   execQuery :: IO (Either QueryError (Either EraMismatch result))
+   execQuery = queryNodeLocalStateWithVersion minNtcVersion localNodeConnInfo Nothing q
 
 getSbe :: CardanoEraStyle era -> ExceptT ShelleyQueryCmdError IO (ShelleyBasedEra era)
 getSbe LegacyByronEra = left ShelleyQueryCmdByronEra
 getSbe (ShelleyBasedEra sbe) = return sbe
 
 queryResult
-  :: Either AcquireFailure (Either EraMismatch a)
+  :: Either QueryError (Either EraMismatch a)
   -> ExceptT ShelleyQueryCmdError IO a
 queryResult eAcq =
   case eAcq of
-    Left acqFailure -> left $ ShelleyQueryCmdAcquireFailure acqFailure
+    Left queryError -> case queryError of
+      QueryErrorAcquireFailure acquireFailure -> left $ ShelleyQueryCmdAcquireFailure acquireFailure
+      QueryErrorUnsupportedVersion minNtcVersion ntcVersion -> left (ShelleyQueryCmdUnsupportedVersion minNtcVersion ntcVersion)
     Right eResult ->
       case eResult of
         Left err -> left . ShelleyQueryCmdLocalStateQueryError $ EraMismatchError err
