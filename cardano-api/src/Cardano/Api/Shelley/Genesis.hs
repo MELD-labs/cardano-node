@@ -61,6 +61,7 @@ shelleyGenesisDefaults =
         , Ledger._maxBBSize = 64 * 1024             -- max 64kb blocks
         , Ledger._maxTxSize = 16 * 1024             -- max 16kb txs
         , Ledger._eMax      = 18
+        , Ledger._minfeeA   = 44
         }
 
       -- genesis keys and initial funds

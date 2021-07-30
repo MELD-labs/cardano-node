@@ -40,6 +40,7 @@ module Cardano.Api.TxBody (
     TxOut(..),
     TxOutValue(..),
     lovelaceToTxOutValue,
+    txOutValueToLovelace,
     serialiseAddressForTxOut,
     TxOutDatumHash(..),
     TxOutInAnyEra(..),
@@ -157,9 +158,9 @@ import qualified Cardano.Crypto.Hashing as Byron
 import qualified Cardano.Ledger.Address as Shelley
 import qualified Cardano.Ledger.AuxiliaryData as Ledger (hashAuxiliaryData)
 import           Cardano.Ledger.BaseTypes (StrictMaybe (..), maybeToStrictMaybe)
-import qualified Cardano.Ledger.Credential as Shelley
 import qualified Cardano.Ledger.Core as Core
 import qualified Cardano.Ledger.Core as Ledger
+import qualified Cardano.Ledger.Credential as Shelley
 import qualified Cardano.Ledger.Era as Ledger
 import qualified Cardano.Ledger.Keys as Shelley
 import qualified Cardano.Ledger.SafeHash as SafeHash
@@ -868,7 +869,11 @@ lovelaceToTxOutValue l =
       Left adaOnly     -> TxOutAdaOnly adaOnly  l
       Right multiAsset -> TxOutValue multiAsset (lovelaceToValue l)
 
-
+txOutValueToLovelace :: TxOutValue era -> Lovelace
+txOutValueToLovelace tv =
+  case tv of
+    TxOutAdaOnly _ l -> l
+    TxOutValue _ v -> selectLovelace v
 -- ----------------------------------------------------------------------------
 -- Transaction output datum (era-dependent)
 --
