@@ -354,6 +354,9 @@ data ScriptExecutionError =
        --
      | ScriptErrorEvaluationFailed Plutus.EvaluationError
 
+     -- | No cost model
+     | ScriptErrorNoCostModel
+
        -- | The execution units overflowed a 64bit word. Congratulations if
        -- you encounter this error. With the current style of cost model this
        -- would need a script to run for over 7 months, which is somewhat more
@@ -386,6 +389,9 @@ instance Error ScriptExecutionError where
       pp = PP.renderString
          . PP.layoutPretty PP.defaultLayoutOptions
          . PP.pretty
+
+  displayError ScriptErrorNoCostModel =
+      "No cost model"
 
   displayError ScriptErrorExecutionUnitsOverflow =
       "The execution units required by this Plutus script overflows a 64bit "
@@ -524,7 +530,9 @@ evaluateTransactionExecutionUnits _eraInMode systemstart history pparams utxo tx
         Alonzo.InvalidTxIn     txin -> ScriptErrorTxInWithoutDatum txin'
                                          where txin' = fromShelleyTxIn txin
         Alonzo.MissingDatum      dh -> ScriptErrorWrongDatum (ScriptDataHash dh)
-        Alonzo.ValidationFailed err -> ScriptErrorEvaluationFailed err
+        Alonzo.ValidationFailedV1 err _ -> ScriptErrorEvaluationFailed err
+        Alonzo.ValidationFailedV2 err _ -> ScriptErrorEvaluationFailed err
+        Alonzo.NoCostModel _ -> ScriptErrorNoCostModel
         Alonzo.IncompatibleBudget _ -> ScriptErrorExecutionUnitsOverflow
 
         -- This is only possible for spending scripts and occurs when

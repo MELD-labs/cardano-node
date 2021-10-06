@@ -73,7 +73,7 @@ import           Cardano.Protocol.TPraos.Rules.Updn
 import           Cardano.Ledger.Shelley.API hiding (ShelleyBasedEra)
 
 import           Cardano.Ledger.Shelley.Rules.Bbody
-import           Cardano.Ledger.Shelley.Rules.Chain
+import           Cardano.Ledger.Chain
 import           Cardano.Ledger.Shelley.Rules.Deleg
 import           Cardano.Ledger.Shelley.Rules.Delegs
 import           Cardano.Ledger.Shelley.Rules.Delpl
@@ -237,11 +237,6 @@ instance ( ShelleyBasedEra era
                       \understand the new major protocol version. This node \
                       \must be upgraded before it can continue with the new \
                       \protocol version."
-  toObject verb (BbodyFailure f) = toObject verb f
-  toObject verb (TickFailure  f) = toObject verb f
-  toObject verb (TicknFailure  f) = toObject verb f
-  toObject verb (PrtclFailure f) = toObject verb f
-  toObject verb (PrtclSeqFailure f) = toObject verb f
 
 instance ToObject (PrtlSeqFailure crypto) where
   toObject _verb (WrongSlotIntervalPrtclSeq (SlotNo lastSlot) (SlotNo currSlot)) =

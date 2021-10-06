@@ -335,6 +335,7 @@ deriving newtype instance ToJSON Alonzo.CostModel
 
 languageToText :: Alonzo.Language -> Text
 languageToText Alonzo.PlutusV1 = "PlutusV1"
+languageToText Alonzo.PlutusV2 = "PlutusV2"
 
 languageFromText :: MonadFail m => Text -> m Alonzo.Language
 languageFromText "PlutusV1" = pure Alonzo.PlutusV1

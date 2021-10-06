@@ -745,7 +745,7 @@ newtype CostModel = CostModel (Map Text Integer)
 validateCostModel :: PlutusScriptVersion lang
                   -> CostModel
                   -> Either InvalidCostModel ()
-validateCostModel PlutusScriptV1 (CostModel m)
+validateCostModel _ (CostModel m)
   | Alonzo.validateCostModelParams m = Right ()
   | otherwise                        = Left (InvalidCostModel (CostModel m))
 
@@ -776,9 +776,11 @@ fromAlonzoCostModels =
 
 toAlonzoScriptLanguage :: AnyPlutusScriptVersion -> Alonzo.Language
 toAlonzoScriptLanguage (AnyPlutusScriptVersion PlutusScriptV1) = Alonzo.PlutusV1
+toAlonzoScriptLanguage (AnyPlutusScriptVersion PlutusScriptV2) = Alonzo.PlutusV2
 
 fromAlonzoScriptLanguage :: Alonzo.Language -> AnyPlutusScriptVersion
 fromAlonzoScriptLanguage Alonzo.PlutusV1 = AnyPlutusScriptVersion PlutusScriptV1
+fromAlonzoScriptLanguage Alonzo.PlutusV2 = AnyPlutusScriptVersion PlutusScriptV2
 
 toAlonzoCostModel :: CostModel -> Alonzo.CostModel
 toAlonzoCostModel (CostModel m) = Alonzo.CostModel m
