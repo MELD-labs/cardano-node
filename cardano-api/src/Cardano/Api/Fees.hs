@@ -46,7 +46,7 @@ import           Data.Bifunctor (bimap, first)
 import qualified Data.ByteString as BS
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (fromMaybe)
+import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Sequence.Strict (StrictSeq (..))
 import           Data.Set (Set)
 import qualified Data.Set as Set
@@ -371,6 +371,9 @@ data ScriptExecutionError =
 
        -- | A cost model was missing for a language which was used.
      | ScriptErrorMissingCostModel Alonzo.Language
+       
+       -- | A cost model was corrupt for a language which was used.
+     | ScriptErrorCorruptCostModel Alonzo.Language
   deriving Show
 
 instance Error ScriptExecutionError where
@@ -411,6 +414,9 @@ instance Error ScriptExecutionError where
 
   displayError (ScriptErrorMissingCostModel language) =
       "No cost model was found for language " <> show language
+  
+  displayError (ScriptErrorCorruptCostModel language) =
+      "A corrupt cost model was found for language " <> show language
 
 data TransactionValidityError =
     -- | The transaction validity interval is too far into the future.
@@ -525,8 +531,8 @@ evaluateTransactionExecutionUnits _eraInMode systemstart history pparams utxo tx
     toAlonzoCostModels costmodels =
       Array.array
         (minBound, maxBound)
-        [ (toAlonzoLanguage lang, toAlonzoCostModel costmodel)
-        | (lang, costmodel) <- Map.toList costmodels ]
+        (mapMaybe toAlonzoScriptLanguageAndCostModel
+          . Map.toList $ costmodels)
 
     fromLedgerScriptExUnitsMap
       :: Map Alonzo.RdmrPtr (Either (Alonzo.ScriptFailure Ledger.StandardCrypto)
@@ -562,6 +568,7 @@ evaluateTransactionExecutionUnits _eraInMode systemstart history pparams utxo tx
         Alonzo.MissingScript rdmrPtr -> ScriptErrorMissingScript rdmrPtr
 
         Alonzo.NoCostModel l -> ScriptErrorMissingCostModel l
+        Alonzo.CorruptCostModel l -> ScriptErrorCorruptCostModel l
 
 
 -- ----------------------------------------------------------------------------

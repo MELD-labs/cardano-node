@@ -86,7 +86,9 @@ genExUnits = do
 genCostModel :: Range Int -> Gen Text -> Gen Integer -> Gen Alonzo.CostModel
 genCostModel r gt gi = do
   map' <- Gen.map r ((,) <$> gt <*> gi)
-  return $ Alonzo.CostModel map'
+  case Alonzo.mkCostModel Alonzo.PlutusV1 map' of
+    Right cm -> return cm
+    _        -> Gen.discard
 
 genAlonzoGenesis :: Gen Alonzo.AlonzoGenesis
 genAlonzoGenesis = do
@@ -105,7 +107,7 @@ genAlonzoGenesis = do
 
   return Alonzo.AlonzoGenesis
     { Alonzo.coinsPerUTxOWord = coinsPerUTxOWord
-    , Alonzo.costmdls = costmdls'
+    , Alonzo.costmdls = Alonzo.CostModels costmdls'
     , Alonzo.prices = prices'
     , Alonzo.maxTxExUnits = maxTxExUnits'
     , Alonzo.maxBlockExUnits = maxBlockExUnits'

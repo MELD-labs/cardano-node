@@ -22,7 +22,7 @@ import qualified Cardano.Ledger.Alonzo.Scripts as Alonzo
 import           Cardano.Ledger.BaseTypes as Ledger
 import           Cardano.Ledger.Shelley.PParams as Ledger (PParams' (..), emptyPParams)
 import           Cardano.Slotting.Slot (EpochSize (..))
-import qualified Plutus.V1.Ledger.Api as Plutus
+import qualified PlutusCore as PC
 
 import           Ouroboros.Consensus.Shelley.Node (ShelleyGenesis (..), emptyGenesisStaking)
 
@@ -86,11 +86,10 @@ shelleyGenesisDefaults =
 -- | Reasonable starting defaults for constructing an 'AlonzoGenesis'.
 alonzoGenesisDefaults :: Alonzo.AlonzoGenesis
 alonzoGenesisDefaults =
-  let cModel = case Alonzo.CostModel <$> Plutus.defaultCostModelParams of
-                 Just (Alonzo.CostModel m) ->
-                   if Alonzo.validateCostModelParams m
-                   then Map.singleton Alonzo.PlutusV1 (Alonzo.CostModel m)
-                   else error "alonzoGenesisDefaults: defaultCostModel is invalid"
+  let cModel = case PC.defaultCostModelParams of
+                 Just m -> case Alonzo.mkCostModel Alonzo.PlutusV1 m of
+                   Right cm -> Alonzo.CostModels $ Map.singleton Alonzo.PlutusV1 cm
+                   _        -> error "alonzoGenesisDefaults: defaultCostModel is invalid"
                  Nothing ->
                    error "alonzoGenesisDefaults: Could not extract cost model \
                          \params from defaultCostModel"

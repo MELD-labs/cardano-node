@@ -6,6 +6,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TupleSections #-}
 
 -- | The various Cardano protocol parameters, including:
 --
@@ -50,8 +51,8 @@ module Cardano.Api.ProtocolParameters (
     toAlonzoPrices,
     fromAlonzoPrices,
     toAlonzoScriptLanguage,
+    toAlonzoScriptLanguageAndCostModel,
     fromAlonzoScriptLanguage,
-    toAlonzoCostModel,
     fromAlonzoCostModel,
 
     -- * Data family instances
@@ -67,7 +68,7 @@ import           Data.Bifunctor (bimap)
 import           Data.ByteString (ByteString)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import           Data.Maybe (fromMaybe, isJust)
+import           Data.Maybe (fromMaybe, isJust, mapMaybe)
 import           Data.String (IsString)
 import           Data.Text (Text)
 import           GHC.Generics
@@ -108,10 +109,9 @@ import           Cardano.Api.SerialiseRaw
 import           Cardano.Api.SerialiseTextEnvelope
 import           Cardano.Api.SerialiseUsing
 import           Cardano.Api.StakePoolMetadata
-import           Cardano.Api.TxMetadata
+import Cardano.Api.TxMetadata ( AsType(AsTxMetadata) )
 import           Cardano.Api.Utils
 import           Cardano.Api.Value
-
 
 -- | The values of the set of /updatable/ protocol parameters. At any
 -- particular point on the chain there is a current set of parameters in use.
@@ -747,11 +747,11 @@ validateCostModel :: PlutusScriptVersion lang
                   -> CostModel
                   -> Either InvalidCostModel ()
 validateCostModel PlutusScriptV1 (CostModel m)
-  | Alonzo.validateCostModelParams m = Right ()
-  | otherwise                        = Left (InvalidCostModel (CostModel m))
+  | Alonzo.isCostModelParamsWellFormed m = Right ()
+  | otherwise                            = Left (InvalidCostModel (CostModel m))
 validateCostModel PlutusScriptV2 (CostModel m)
-  | Alonzo.validateCostModelParams m = Right ()
-  | otherwise                        = Left (InvalidCostModel (CostModel m))
+  | Alonzo.isCostModelParamsWellFormed m = Right ()
+  | otherwise                            = Left (InvalidCostModel (CostModel m))
 
 -- TODO alonzo: it'd be nice if the library told us what was wrong
 newtype InvalidCostModel = InvalidCostModel CostModel
@@ -764,19 +764,27 @@ instance Error InvalidCostModel where
 
 toAlonzoCostModels
   :: Map AnyPlutusScriptVersion CostModel
-  -> Map Alonzo.Language Alonzo.CostModel
+  -> Alonzo.CostModels
 toAlonzoCostModels =
-    Map.fromList
-  . map (bimap toAlonzoScriptLanguage toAlonzoCostModel)
+  Alonzo.CostModels
+  . Map.fromList
+  . mapMaybe toAlonzoScriptLanguageAndCostModel
   . Map.toList
 
 fromAlonzoCostModels
-  :: Map Alonzo.Language Alonzo.CostModel
+  :: Alonzo.CostModels
   -> Map AnyPlutusScriptVersion CostModel
 fromAlonzoCostModels =
     Map.fromList
   . map (bimap fromAlonzoScriptLanguage fromAlonzoCostModel)
   . Map.toList
+  . Alonzo.unCostModels
+
+toAlonzoScriptLanguageAndCostModel :: (AnyPlutusScriptVersion, CostModel) -> Maybe (Alonzo.Language, Alonzo.CostModel)
+toAlonzoScriptLanguageAndCostModel (AnyPlutusScriptVersion PlutusScriptV1, CostModel cm) =
+  ((Alonzo.PlutusV1, ) <$>) . either (const Nothing) Just $ Alonzo.mkCostModel Alonzo.PlutusV1 cm
+toAlonzoScriptLanguageAndCostModel (AnyPlutusScriptVersion PlutusScriptV2, CostModel cm) =
+  ((Alonzo.PlutusV2, ) <$>) . either (const Nothing) Just $ Alonzo.mkCostModel Alonzo.PlutusV2 cm
 
 toAlonzoScriptLanguage :: AnyPlutusScriptVersion -> Alonzo.Language
 toAlonzoScriptLanguage (AnyPlutusScriptVersion PlutusScriptV1) = Alonzo.PlutusV1
@@ -786,11 +794,11 @@ fromAlonzoScriptLanguage :: Alonzo.Language -> AnyPlutusScriptVersion
 fromAlonzoScriptLanguage Alonzo.PlutusV1 = AnyPlutusScriptVersion PlutusScriptV1
 fromAlonzoScriptLanguage Alonzo.PlutusV2 = AnyPlutusScriptVersion PlutusScriptV2
 
-toAlonzoCostModel :: CostModel -> Alonzo.CostModel
-toAlonzoCostModel (CostModel m) = Alonzo.CostModel m
+-- toAlonzoCostModel :: CostModel -> Alonzo.CostModel
+-- toAlonzoCostModel (CostModel m) = Alonzo.CostModel m
 
 fromAlonzoCostModel :: Alonzo.CostModel -> CostModel
-fromAlonzoCostModel (Alonzo.CostModel m) = CostModel m
+fromAlonzoCostModel = CostModel . Alonzo.getCostModelParams
 
 
 -- ----------------------------------------------------------------------------

@@ -131,6 +131,7 @@ library
                       , ouroboros-network
                       , ouroboros-network-framework
                       , parsec
+                      , plutus-core
                       , plutus-ledger-api
                       , prettyprinter
                       , scientific
@@ -177,6 +178,7 @@ library gen
                       , containers
                       , hedgehog
                       , plutus-ledger-api
+                      , plutus-core
                       , cardano-ledger-shelley
                       , text
 

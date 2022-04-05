@@ -77,7 +77,8 @@ import qualified Cardano.Binary as CBOR
 import qualified Cardano.Crypto.Hash as Crypto
 import qualified Cardano.Crypto.Seed as Crypto
 import qualified Cardano.Ledger.Shelley.TxBody as Ledger (EraIndependentTxBody)
-import qualified Plutus.V1.Ledger.Api as Plutus
+-- import qualified Plutus.V1.Ledger.Api as Plutus
+import qualified PlutusCore as PC
 
 import           Hedgehog (Gen, Range)
 import qualified Hedgehog.Gen as Gen
@@ -748,7 +749,7 @@ genUpdateProposal =
     <*> genEpochNo
 
 genCostModel :: Gen CostModel
-genCostModel = case Plutus.defaultCostModelParams of
+genCostModel = case PC.defaultCostModelParams of
   Nothing -> panic "Plutus defaultCostModelParams is broken."
   Just dcm ->
       CostModel

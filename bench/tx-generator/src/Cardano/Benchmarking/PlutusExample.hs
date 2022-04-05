@@ -4,7 +4,6 @@
 module Cardano.Benchmarking.PlutusExample
 where
 import           Prelude
-import qualified Data.Map as Map
 
 import           Control.Monad.Trans.Except
 import qualified Data.ByteString.Char8 as BSC
@@ -12,12 +11,13 @@ import qualified Data.ByteString.Char8 as BSC
 import           Cardano.CLI.Shelley.Script (readFileScriptInAnyLang)
 
 import           Cardano.Api
-import           Cardano.Api.Shelley (ProtocolParameters, PlutusScript(..), fromAlonzoExUnits, protocolParamCostModels, toPlutusData)
+import           Cardano.Api.Shelley (ProtocolParameters, PlutusScript(..), fromAlonzoExUnits, toPlutusData)
 import           Cardano.Ledger.Alonzo.TxInfo (exBudgetToExUnits)
 import           Cardano.Benchmarking.FundSet
 import           Cardano.Benchmarking.Wallet
 
 import qualified Plutus.V1.Ledger.Api as Plutus
+import qualified Plutus.V1.Ledger.EvaluationContext as Plutus
 import           Plutus.V1.Ledger.Contexts (ScriptContext(..), ScriptPurpose(..), TxInfo(..), TxOutRef(..))
 
 mkUtxoScript ::
@@ -71,11 +71,8 @@ preExecuteScript ::
   -> ScriptData
   -> ScriptData
   -> Either String ExecutionUnits
-preExecuteScript protocolParameters (PlutusScript _ (PlutusScriptSerialised script)) datum redeemer = do
-  costModel <- case Map.lookup (AnyPlutusScriptVersion PlutusScriptV1) (protocolParamCostModels protocolParameters) of
-    Just (CostModel x) -> Right x
-    Nothing -> Left "costModel unavailable"
-  let (_logout, res) = Plutus.evaluateScriptCounting Plutus.Verbose costModel script
+preExecuteScript _ (PlutusScript _ (PlutusScriptSerialised script)) datum redeemer = do
+  let (_logout, res) = Plutus.evaluateScriptCounting (Plutus.ProtocolVersion 5 0) Plutus.Verbose Plutus.evalCtxForTesting script
                               [ toPlutusData datum
                               , toPlutusData redeemer
                               , Plutus.toData dummyContext ]
