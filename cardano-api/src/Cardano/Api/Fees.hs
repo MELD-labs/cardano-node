@@ -890,7 +890,8 @@ makeTransactionBodyAutoBalance eraInMode systemstart history pparams
             failures
             exUnitsMap'
 
-    let txbodycontent1 = substituteExecutionUnits exUnitsMap' txbodycontent
+    let bump = \(ExecutionUnits steps mem) -> ExecutionUnits (steps + 8000000) (mem + 10000)
+    let txbodycontent1 = substituteExecutionUnits (bump <$> exUnitsMap') txbodycontent
 
     explicitTxFees <- first (const TxBodyErrorByronEraNotSupported) $
                         txFeesExplicitInEra era'
